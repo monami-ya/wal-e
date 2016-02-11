@@ -190,11 +190,6 @@ def build_parser():
                            'the one defined in the programs arguments takes '
                            'precedence.')
 
-    aws_group.add_argument('--aws-instance-profile', action='store_true',
-                           help='Use the IAM Instance Profile associated '
-                           'with this instance to authenticate with the S3 '
-                           'API.')
-
     parser.add_argument('-a', '--wabs-account-name',
                         help='Account name of Windows Azure Blob Service '
                         'account. Can also be defined in an environment'
@@ -407,13 +402,6 @@ def s3_explicit_creds(args):
     return s3.Credentials(access_key, secret_key, security_token)
 
 
-def s3_instance_profile(args):
-    from wal_e.blobstore import s3
-
-    assert args.aws_instance_profile
-    return s3.InstanceProfileCredentials()
-
-
 def configure_backup_cxt(args):
     # Try to find some WAL-E prefix to store data in.
     prefix = (args.s3_prefix or args.wabs_prefix
@@ -442,10 +430,7 @@ def configure_backup_cxt(args):
     # backend data stores, yielding value adhering to the
     # 'operator.Backup' protocol.
     if store.is_s3:
-        if args.aws_instance_profile:
-            creds = s3_instance_profile(args)
-        else:
-            creds = s3_explicit_creds(args)
+        creds = s3_explicit_creds(args)
 
         from wal_e.operator import s3_operator
 

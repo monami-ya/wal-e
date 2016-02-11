@@ -1,15 +1,24 @@
 import gevent
 import pytest
 
+import boto3
+from fast_wait import fast_wait
 from gevent import coros
 
-from boto.s3 import bucket
-from boto.s3 import key
-from fast_wait import fast_wait
+from s3_integration_help import (
+    no_real_s3_credentials,
+)
+
 from wal_e import exception
 from wal_e.worker.s3 import s3_deleter
 
+
 assert fast_wait
+
+
+# Contrivance to quiet down pyflakes, since pytest does some
+# string-evaluation magic in test collection.
+no_real_s3_credentials = no_real_s3_credentials
 
 
 class BucketDeleteKeysCollector(object):
@@ -60,14 +69,19 @@ def collect(monkeypatch):
     """
 
     collect = BucketDeleteKeysCollector()
-    monkeypatch.setattr(bucket.Bucket, 'delete_keys', collect)
+    monkeypatch.setattr(conn.Bucket, 'delete_objects', collect)
 
     return collect
 
 
 @pytest.fixture
 def b():
-    return bucket.Bucket(name='test-bucket-name')
+    return conn().Bucket('test-bucket-name')
+
+
+@pytest.fixture
+def conn():
+    return boto3.resource('s3')
 
 
 @pytest.fixture(autouse=True)
@@ -81,8 +95,8 @@ def never_use_single_delete(monkeypatch):
     def die():
         assert False
 
-    monkeypatch.setattr(key.Key, 'delete', die)
-    monkeypatch.setattr(bucket.Bucket, 'delete_key', die)
+    monkeypatch.setattr(conn().Object, 'delete', die)
+    monkeypatch.setattr(conn().Bucket, 'delete_object', die)
 
 
 def test_construction():
@@ -100,10 +114,11 @@ def test_close_error():
         d.delete('no value should work')
 
 
+@pytest.mark.skipif("no_real_s3_credentials()")
 def test_processes_one_deletion(b, collect):
     # Mock up a key and bucket
     key_name = 'test-key-name'
-    k = key.Key(bucket=b, name=key_name)
+    k = b.Object(key_name)
 
     d = s3_deleter.Deleter()
     d.delete(k)
@@ -112,13 +127,14 @@ def test_processes_one_deletion(b, collect):
     assert collect.deleted_keys == [key_name]
 
 
+@pytest.mark.skipif("no_real_s3_credentials()")
 def test_processes_many_deletions(b, collect):
     # Generate a target list of keys in a stable order
     target = sorted(['test-key-' + str(x) for x in range(20001)])
 
     # Construct boto S3 Keys from the generated names and delete them
     # all.
-    keys = [key.Key(bucket=b, name=key_name) for key_name in target]
+    keys = [b.Object(key_name) for key_name in target]
     d = s3_deleter.Deleter()
 
     for k in keys:
@@ -132,10 +148,11 @@ def test_processes_many_deletions(b, collect):
     assert sorted(collect.deleted_keys) == target
 
 
+@pytest.mark.skipif("no_real_s3_credentials()")
 def test_retry_on_normal_error(b, collect):
     """Ensure retries are processed for most errors."""
     key_name = 'test-key-name'
-    k = key.Key(bucket=b, name=key_name)
+    k = b.Object(key_name)
 
     collect.inject(Exception('Normal error'))
     d = s3_deleter.Deleter()
@@ -158,10 +175,11 @@ def test_retry_on_normal_error(b, collect):
     assert collect.deleted_keys == [key_name]
 
 
+@pytest.mark.skipif("no_real_s3_credentials()")
 def test_no_retry_on_keyboadinterrupt(b, collect):
     """Ensure that KeyboardInterrupts are forwarded."""
     key_name = 'test-key-name'
-    k = key.Key(bucket=b, name=key_name)
+    k = b.Object(key_name)
 
     # If vanilla KeyboardInterrupt is used, then sending SIGINT to the
     # test can cause it to pass improperly, so use a subtype instead.

@@ -1,9 +1,11 @@
-from urlparse import urlparse
-import socket
-import traceback
+import collections
 import gevent
+import socket
+import shutil
+import traceback
+from urlparse import urlparse
 
-import boto
+import botocore
 
 from . import calling_format
 from wal_e import files
@@ -14,29 +16,24 @@ from wal_e.retries import retry, retry_with_count
 
 logger = log_help.WalELogger(__name__)
 
-# Set a timeout for boto HTTP operations should no timeout be set.
-# Yes, in the case the user *wanted* no timeouts, this would set one.
-# If that becomes a problem, someone should post a bug, although I am
-# having a hard time imagining why that behavior could ever be useful.
-if not boto.config.has_option('Boto', 'http_socket_timeout'):
-    if not boto.config.has_section('Boto'):
-        boto.config.add_section('Boto')
-
-    boto.config.set('Boto', 'http_socket_timeout', '5')
+_Key = collections.namedtuple('_Key', ['size'])
 
 
-def _uri_to_key(creds, uri, conn=None):
+def _uri_to_bucket(creds, uri, conn=None):
     assert uri.startswith('s3://')
     url_tup = urlparse(uri)
     bucket_name = url_tup.netloc
-    cinfo = calling_format.from_store_name(bucket_name)
-    if conn is None:
-        conn = cinfo.connect(creds)
-    bucket = boto.s3.bucket.Bucket(connection=conn, name=bucket_name)
-    return boto.s3.key.Key(bucket=bucket, name=url_tup.path)
+    conn = calling_format.CallingInfo().connect(creds)
+    return conn.Bucket(bucket_name)
 
 
-def uri_put_file(creds, uri, fp, content_encoding=None, conn=None):
+def _uri_to_key(creds, uri, conn=None):
+    bucket = _uri_to_bucket(creds, uri, conn)
+    url_tup = urlparse(uri)
+    return bucket.Object(url_tup.path.lstrip('/'))
+
+
+def uri_put_file(creds, uri, fp, content_encoding=None):
     # Per Boto 2.2.2, which will only read from the current file
     # position to the end.  This manifests as successfully uploaded
     # *empty* keys in S3 instead of the intended data because of how
@@ -47,18 +44,18 @@ def uri_put_file(creds, uri, fp, content_encoding=None, conn=None):
     # in mind, assert it as a precondition for using this procedure.
     assert fp.tell() == 0
 
-    k = _uri_to_key(creds, uri, conn=conn)
+    bucket = _uri_to_bucket(creds, uri)
 
-    if content_encoding is not None:
-        k.content_type = content_encoding
+    url_tup = urlparse(uri)
 
-    k.set_contents_from_file(fp, encrypt_key=True)
-    return k
+    k = bucket.put_object(Key=url_tup.path.lstrip('/'), Body=fp)
+    return _Key(size=k.content_length)
 
 
 def uri_get_file(creds, uri, conn=None):
     k = _uri_to_key(creds, uri, conn=conn)
-    return k.get_contents_as_string()
+    # boto3 returns a file descriptor, so we need to read it off the socket
+    return k.get()['Body'].read()
 
 
 def do_lzop_get(creds, url, path, decrypt, do_retry=True):
@@ -85,12 +82,7 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
             logger.info(
                 msg='Retrying fetch because of a socket error',
                 detail=standard_detail_message(
-                    "The socket error's message is '{0}'."
-                    .format(socketmsg)))
-        elif (issubclass(typ, boto.exception.S3ResponseError) and
-              value.error_code == 'RequestTimeTooSkewed'):
-            logger.info(msg='Retrying fetch because of a Request Skew time',
-                        detail=standard_detail_message())
+                    "The socket error's message is '{0}'.".format(socketmsg)))
         else:
             # For all otherwise untreated exceptions, report them as a
             # warning and retry anyway -- all exceptions that can be
@@ -118,8 +110,8 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
                     exc = g.get()
                     if exc is not None:
                         raise exc
-                except boto.exception.S3ResponseError, e:
-                    if e.status == 404:
+                except botocore.exceptions.ClientError, e:
+                    if e.response['Error']['Code'] == 'NoSuchKey':
                         # Do not retry if the key not present, this
                         # can happen under normal situations.
                         pl.abort()
@@ -151,7 +143,7 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
 
 def write_and_return_error(key, stream):
     try:
-        key.get_contents_to_file(stream)
+        stream.write(key.get()['Body'].read())
         stream.flush()
     except Exception, e:
         return e

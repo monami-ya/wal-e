@@ -303,7 +303,11 @@ class StorageLayout(object):
         return self._url_tup.netloc
 
     def key_name(self, key):
-        return key.name.lstrip('/')
+        if self.is_s3:
+            name = key.key
+        else:
+            name = key.name
+        return name.lstrip('/')
 
     def key_last_modified(self, key):
         if hasattr(key, 'last_modified'):

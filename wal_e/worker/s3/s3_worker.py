@@ -23,7 +23,7 @@ logger = log_help.WalELogger(__name__)
 
 
 def get_bucket(conn, name):
-    return conn.get_bucket(name, validate=False)
+    return conn.Bucket(name)
 
 
 class TarPartitionLister(object):
@@ -37,10 +37,10 @@ class TarPartitionLister(object):
             self.backup_info)
 
         bucket = get_bucket(self.s3_conn, self.layout.store_name())
-        for key in bucket.list(prefix=prefix):
+        for key in bucket.objects.filter(Prefix=prefix):
             url = 's3://{bucket}/{name}'.format(bucket=key.bucket.name,
-                                                name=key.name)
-            key_last_part = key.name.rsplit('/', 1)[-1]
+                                                name=key.key.lsplit('/'))
+            key_last_part = key.key.rsplit('/', 1)[-1]
             match = re.match(storage.VOLUME_REGEXP, key_last_part)
             if match is None:
                 logger.warning(
@@ -72,7 +72,7 @@ class BackupFetcher(object):
             .format(partition_name),
             hint='The absolute S3 key is {0}.'.format(part_abs_name))
 
-        key = self.bucket.get_key(part_abs_name)
+        key = self.bucket.Object(part_abs_name)
         with get_download_pipeline(PIPE, PIPE, self.decrypt) as pl:
             g = gevent.spawn(s3.write_and_return_error, key, pl.stdin)
             TarPartition.tarfile_extract(pl.stdout, self.local_root)
@@ -86,11 +86,11 @@ class BackupFetcher(object):
 class BackupList(_BackupList):
 
     def _backup_detail(self, key):
-        return key.get_contents_as_string()
+        return key.get()['Body'].read()
 
     def _backup_list(self, prefix):
         bucket = get_bucket(self.conn, self.layout.store_name())
-        return bucket.list(prefix=prefix)
+        return bucket.objects.filter(Prefix=prefix)
 
 
 class DeleteFromContext(_DeleteFromContext):
@@ -108,4 +108,4 @@ class DeleteFromContext(_DeleteFromContext):
 
     def _backup_list(self, prefix):
         bucket = get_bucket(self.conn, self.layout.store_name())
-        return bucket.list(prefix=prefix)
+        return bucket.objects.filter(Prefix=prefix)
