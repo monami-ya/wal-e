@@ -41,7 +41,9 @@ def _s3connection_opts_from_uri(impl):
         raise UserException(
             msg='WALE_S3_ENDPOINT does not support query parameters')
 
-    return {'endpoint_url': impl}
+    config = botocore.client.Config(signature_version='s3v4')
+
+    return {'endpoint_url': impl, 'config': config}
 
 
 def _is_ipv4_like(s):
