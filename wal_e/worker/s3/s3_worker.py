@@ -39,7 +39,7 @@ class TarPartitionLister(object):
         bucket = get_bucket(self.s3_conn, self.layout.store_name())
         for key in bucket.objects.filter(Prefix=prefix):
             url = 's3://{bucket}/{name}'.format(bucket=key.bucket_name,
-                                                name=key.key.lsplit('/'))
+                                                name=key.key.lstrip('/'))
             key_last_part = key.key.rsplit('/', 1)[-1]
             match = re.match(storage.VOLUME_REGEXP, key_last_part)
             if match is None:
