@@ -109,15 +109,13 @@ class CallingInfo(object):
             logger.info(
                 'connecting to S3 with WALE_S3_ENDPOINT ({})'.format(impl))
             conn = boto3.resource('s3', **_s3connection_opts_from_uri(impl))
+            conn.meta.client.meta.events.unregister(
+                'before-sign.s3',
+                fix_s3_host)
         else:
             logger.info('connecting to S3 with creds ({})'.format(creds))
             # connect using the safest available options.
-            creds.use_ssl = True
-            creds.verify = True
-            conn = boto3.resource('s3', **creds.__dict__)
+            conn = boto3.resource('s3')
         # Remove the handler that switches S3 requests to virtual host style
         # addressing.
-        conn.meta.client.meta.events.unregister(
-            'before-sign.s3',
-            fix_s3_host)
         return conn
