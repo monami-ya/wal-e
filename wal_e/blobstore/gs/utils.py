@@ -1,6 +1,7 @@
 from datetime import datetime
 from datetime import timedelta
 from gcloud import storage
+from gcloud import exceptions
 from urlparse import urlparse
 import gevent
 import shutil
@@ -23,7 +24,7 @@ def _uri_to_blob(creds, uri, conn=None):
     url_tup = urlparse(uri)
     bucket_name = url_tup.netloc
     if conn is None:
-        conn = calling_format.connect(creds)
+        conn = calling_format.CallingInfo().connect(creds)
     b = storage.Bucket(conn, name=bucket_name)
     return storage.Blob(url_tup.path, b)
 
@@ -43,15 +44,12 @@ def uri_put_file(creds, uri, fp, content_encoding=None, conn=None):
 
 def uri_get_file(creds, uri, conn=None):
     blob = _uri_to_blob(creds, uri, conn=conn)
-    signed = blob.generate_signed_url(
-        datetime.datetime.utcnow() + timedelta(minutes=10))
-    reader = urllib2.urlopen(signed)
-    return reader.read()
+    return blob.download_as_string()
 
 
 def do_lzop_get(creds, url, path, decrypt, do_retry=True):
     """
-    Get and decompress a S3 URL
+    Get and decompress a GCS URL
 
     This streams the content directly to lzop; the compressed version
     is never stored on disk.
@@ -95,31 +93,28 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
         with files.DeleteOnError(path) as decomp_out:
             blob = _uri_to_blob(creds, url)
             with get_download_pipeline(PIPE, decomp_out.f, decrypt) as pl:
-                signed = blob.generate_signed_url(
-                    datetime.utcnow() + timedelta(minutes=10))
-                g = gevent.spawn(write_and_return_error, signed, pl.stdin)
+                g = gevent.spawn(write_and_return_error, blob, pl.stdin)
 
                 try:
                     # Raise any exceptions from write_and_return_error
                     exc = g.get()
                     if exc is not None:
                         raise exc
-                except urllib2.HTTPError as e:
-                    if e.code == 404:
-                        # Do not retry if the blob not present, this
-                        # can happen under normal situations.
-                        pl.abort()
-                        logger.warning(
-                            msg=('could no longer locate object while '
-                                 'performing wal restore'),
-                            detail=('The absolute URI that could not be '
-                                    'located is {url}.'.format(url=url)),
-                            hint=('This can be normal when Postgres is trying '
-                                  'to detect what timelines are available '
-                                  'during restoration.'))
-                        decomp_out.remove_regardless = True
-                        return False
-
+                except exceptions.NotFound as e:
+                    # Do not retry if the blob not present, this
+                    # can happen under normal situations.
+                    pl.abort()
+                    logger.warning(
+                        msg=('could no longer locate object while '
+                             'performing wal restore'),
+                        detail=('The absolute URI that could not be '
+                                'located is {url}.'.format(url=url)),
+                        hint=('This can be normal when Postgres is trying '
+                              'to detect what timelines are available '
+                              'during restoration.'))
+                    decomp_out.remove_regardless = True
+                    return False
+                except:
                     raise
 
             logger.info(
@@ -135,10 +130,9 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
     return download()
 
 
-def write_and_return_error(signed, stream):
+def write_and_return_error(blob, stream):
     try:
-        reader = urllib2.urlopen(signed)
-        shutil.copyfileobj(reader, stream)
+        stream.write(blob.download_as_string())
         stream.flush()
     except Exception, e:
         return e

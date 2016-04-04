@@ -156,7 +156,7 @@ Push a base backup to Swift::
 Push a base backup to Google Cloud Storage::
 
   $ WALE_GS_PREFIX="gs://some-bucket/directory-or-whatever"     \
-    GOOGLE_APPLICATION_CREDENTIALS=...                          \
+    GS_APPLICATION_CREDS=...                          \
     wal-e backup-push /var/lib/my/database
 
 It is generally recommended that one use some sort of environment

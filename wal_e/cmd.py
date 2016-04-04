@@ -196,8 +196,8 @@ def build_parser():
                            'API.')
 
     gs_group = parser.add_mutually_exclusive_group()
-    gs_group.add_argument('--gs-access-key-id',
-                          help='public GS access key. Can also be defined '
+    gs_group.add_argument('--gs-application-creds',
+                          help='path to service account json. Can also be defined '
                           'in an environment variable. If both are defined, '
                           'the one defined in the programs arguments takes '
                           'precedence.')
@@ -435,21 +435,15 @@ def gs_creds(args):
     from wal_e.blobstore import gs
 
     if args.gs_instance_metadata:
-        access_key, secret_key = None, None
+        service_account = None
     else:
-        access_key = args.gs_access_key_id or os.getenv('GS_ACCESS_KEY_ID')
-        if access_key is None:
+        service_account = args.gs_application_creds or os.getenv('GS_APPLICATION_CREDS')
+        if service_account is None:
             raise UserException(
-                msg='GS Access Key credential is required but not provided',
-                hint=(_config_hint_generate('gs-access-key-id', True)))
+                msg='GS service account is required but not provided',
+                hint=(_config_hint_generate('gs-application-creds', True)))
 
-        secret_key = os.getenv('GS_SECRET_ACCESS_KEY')
-        if secret_key is None:
-            raise UserException(
-                msg='GS Secret Key credential is required but not provided',
-                hint=_config_hint_generate('gs-secret-access-key', False))
-
-    return gs.Credentials(access_key, secret_key)
+    return gs.Credentials(service_account)
 
 def configure_backup_cxt(args):
     # Try to find some WAL-E prefix to store data in.
@@ -519,8 +513,9 @@ def configure_backup_cxt(args):
         )
         return SwiftBackup(store, creds, gpg_key_id)
     elif store.is_gs:
+        creds = gs_creds(args)
         from wal_e.operator.gs_operator import GSBackup
-        return GSBackup(store, gpg_key_id)
+        return GSBackup(store, creds, gpg_key_id)
     else:
         raise UserCritical(
             msg='no unsupported blob stores should get here',

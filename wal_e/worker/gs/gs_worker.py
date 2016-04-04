@@ -71,13 +71,11 @@ class BackupFetcher(object):
             msg='beginning partition download',
             detail='The partition being downloaded is {0}.'
             .format(partition_name),
-            hint='The absolute S3 key is {0}.'.format(part_abs_name))
+            hint='The absolute GCS key is {0}.'.format(part_abs_name))
 
         blob = self.bucket.get_blob('/' + part_abs_name)
-        signed = blob.generate_signed_url(datetime.datetime.utcnow() +
-                                          datetime.timedelta(minutes=10))
         with get_download_pipeline(PIPE, PIPE, self.decrypt) as pl:
-            g = gevent.spawn(gs.write_and_return_error, signed, pl.stdin)
+            g = gevent.spawn(gs.write_and_return_error, blob, pl.stdin)
             TarPartition.tarfile_extract(pl.stdout, self.local_root)
 
             # Raise any exceptions guarded by write_and_return_error.
