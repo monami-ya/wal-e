@@ -1,4 +1,4 @@
-from azure.storage.blobservice import BlobService
+from azure.storage.blob import BlockBlobService
 from wal_e import log_help
 
 logger = log_help.WalELogger(__name__)
@@ -23,9 +23,7 @@ class CallingInfo(object):
     def connect(self, creds):
         """Return an azure BlobService instance.
         """
-        return BlobService(account_name=creds.account_name,
-                           account_key=creds.account_key,
-                           protocol='https')
+        return BlockBlobService(account_name=creds.account_name, account_key=creds.account_key)
 
 
 def from_store_name(container_name):
