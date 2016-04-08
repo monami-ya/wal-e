@@ -1,13 +1,9 @@
-from datetime import datetime
-from datetime import timedelta
 from gcloud import storage
 from gcloud import exceptions
 from urlparse import urlparse
 import gevent
-import shutil
 import socket
 import traceback
-import urllib2
 
 from . import calling_format
 from wal_e import files
@@ -100,7 +96,7 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
                     exc = g.get()
                     if exc is not None:
                         raise exc
-                except exceptions.NotFound as e:
+                except exceptions.NotFound:
                     # Do not retry if the blob not present, this
                     # can happen under normal situations.
                     pl.abort()

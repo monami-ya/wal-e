@@ -190,17 +190,12 @@ def build_parser():
                            'the one defined in the programs arguments takes '
                            'precedence.')
 
-    aws_group.add_argument('--aws-instance-profile', action='store_true',
-                           help='Use the IAM Instance Profile associated '
-                           'with this instance to authenticate with the S3 '
-                           'API.')
-
     gs_group = parser.add_mutually_exclusive_group()
     gs_group.add_argument('--gs-application-creds',
-                          help='path to service account json. Can also be defined '
-                          'in an environment variable. If both are defined, '
-                          'the one defined in the programs arguments takes '
-                          'precedence.')
+                          help='path to service account json. Can also be '
+                          'defined in an environment variable. If both are '
+                          'defined, the one defined in the programs arguments '
+                          'takes precedence.')
 
     gs_group.add_argument('--gs-instance-metadata', action='store_true',
                           help='Use the GCE Metadata server associated '
@@ -424,26 +419,21 @@ def s3_explicit_creds(args):
     return s3.Credentials(access_key, secret_key, security_token)
 
 
-def s3_instance_profile(args):
-    from wal_e.blobstore import s3
-
-    assert args.aws_instance_profile
-    return s3.InstanceProfileCredentials()
-
-
 def gs_creds(args):
     from wal_e.blobstore import gs
 
     if args.gs_instance_metadata:
         service_account = None
     else:
-        service_account = args.gs_application_creds or os.getenv('GS_APPLICATION_CREDS')
+        service_account = (args.gs_application_creds
+                            or os.getenv('GS_APPLICATION_CREDS'))
         if service_account is None:
             raise UserException(
                 msg='GS service account is required but not provided',
                 hint=(_config_hint_generate('gs-application-creds', True)))
 
     return gs.Credentials(service_account)
+
 
 def configure_backup_cxt(args):
     # Try to find some WAL-E prefix to store data in.

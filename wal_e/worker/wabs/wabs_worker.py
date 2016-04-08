@@ -84,7 +84,8 @@ class BackupFetcher(object):
 class BackupList(_BackupList):
 
     def _backup_detail(self, blob):
-        return self.conn.get_blob_to_text(self.layout.store_name(), blob.name).content
+        return self.conn.get_blob_to_text(self.layout.store_name(),
+                        blob.name).content
 
     def _backup_list(self, prefix):
         blob_list = self.conn.list_blobs(self.layout.store_name(),

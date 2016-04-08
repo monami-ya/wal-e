@@ -1,4 +1,4 @@
-from azure.storage import BlobService
+from azure.storage.blob import BlockBlobService
 import os
 
 
@@ -18,7 +18,7 @@ def no_real_wabs_credentials():
 
 
 def apathetic_container_delete(container_name, *args, **kwargs):
-    conn = BlobService(*args, **kwargs)
+    conn = BlockBlobService(*args, **kwargs)
     conn.delete_container(container_name)
 
     return conn

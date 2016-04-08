@@ -5,7 +5,6 @@ These are functions that are amenable to be called from other modules,
 with the intention that they are used in gevent greenlets.
 
 """
-import datetime
 import gevent
 import re
 

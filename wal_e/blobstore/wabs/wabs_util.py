@@ -1,10 +1,6 @@
-import base64
 import collections
-import errno
 import gevent
-import os
 import socket
-import sys
 import traceback
 
 from azure.common import AzureMissingResourceHttpError
@@ -12,7 +8,6 @@ from azure.storage.blob import BlockBlobService
 from azure.storage.blob import ContentSettings
 
 from . import calling_format
-from hashlib import md5
 from urlparse import urlparse
 from wal_e import log_help
 from wal_e import files
@@ -36,9 +31,11 @@ def uri_put_file(creds, uri, fp, content_encoding=None):
     size = fp.tell()
 
     fp.seek(0, 0)
-    conn = BlockBlobService(account_name=creds.account_name, account_key=creds.account_key)
+    conn = BlockBlobService(account_name=creds.account_name,
+                account_key=creds.account_key)
     if content_encoding is not None:
-        conn.create_blob_from_stream(url_tup.netloc, url_tup.path, fp, content_settings=ContentSettings(content_type=content_encoding))
+        conn.create_blob_from_stream(url_tup.netloc, url_tup.path, fp,
+            content_settings=ContentSettings(content_type=content_encoding))
     else:
         conn.create_blob_from_stream(url_tup.netloc, url_tup.path, fp)
 
@@ -53,7 +50,8 @@ def uri_get_file(creds, uri, conn=None):
     url_tup = urlparse(uri)
 
     if conn is None:
-        conn = BlockBlobService(account_name=creds.account_name, account_key=creds.account_key)
+        conn = BlockBlobService(account_name=creds.account_name,
+                account_key=creds.account_key)
     return conn.get_blob_to_bytes(url_tup.netloc, url_tup.path).content
 
 
@@ -68,7 +66,8 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
     assert url.endswith('.lzo'), 'Expect an lzop-compressed file'
     assert url.startswith('wabs://')
 
-    conn = BlockBlobService(account_name=creds.account_name, account_key=creds.account_key)
+    conn = BlockBlobService(account_name=creds.account_name,
+                account_key=creds.account_key)
 
     def log_wal_fetch_failures_on_error(exc_tup, exc_processor_cxt):
         def standard_detail_message(prefix=''):

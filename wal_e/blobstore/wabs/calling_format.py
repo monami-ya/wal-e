@@ -23,7 +23,8 @@ class CallingInfo(object):
     def connect(self, creds):
         """Return an azure BlobService instance.
         """
-        return BlockBlobService(account_name=creds.account_name, account_key=creds.account_key)
+        return BlockBlobService(account_name=creds.account_name,
+                    account_key=creds.account_key)
 
 
 def from_store_name(container_name):
