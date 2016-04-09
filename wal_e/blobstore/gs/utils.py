@@ -1,73 +1,57 @@
-import collections
+from gcloud import storage
+from gcloud import exceptions
+from urlparse import urlparse
 import gevent
 import socket
 import traceback
 
-from azure.common import AzureMissingResourceHttpError
-from azure.storage.blob import BlockBlobService
-from azure.storage.blob import ContentSettings
-
 from . import calling_format
-from urlparse import urlparse
-from wal_e import log_help
 from wal_e import files
+from wal_e import log_help
 from wal_e.pipeline import get_download_pipeline
 from wal_e.piper import PIPE
 from wal_e.retries import retry, retry_with_count
 
-assert calling_format
-
 logger = log_help.WalELogger(__name__)
 
-_Key = collections.namedtuple('_Key', ['size'])
-WABS_CHUNK_SIZE = 4 * 1024 * 1024
 
-
-def uri_put_file(creds, uri, fp, content_encoding=None):
-    assert fp.tell() == 0
-    assert uri.startswith('wabs://')
+def _uri_to_blob(creds, uri, conn=None):
+    assert uri.startswith('gs://')
     url_tup = urlparse(uri)
+    bucket_name = url_tup.netloc
+    if conn is None:
+        conn = calling_format.CallingInfo().connect(creds)
+    b = storage.Bucket(conn, name=bucket_name)
+    return storage.Blob(url_tup.path, b)
+
+
+def uri_put_file(creds, uri, fp, content_encoding=None, conn=None):
+    assert fp.tell() == 0
+    blob = _uri_to_blob(creds, uri, conn=conn)
+
     fp.seek(0, 2)
     size = fp.tell()
 
     fp.seek(0, 0)
-    conn = BlockBlobService(account_name=creds.account_name,
-                account_key=creds.account_key)
-    if content_encoding is not None:
-        conn.create_blob_from_stream(url_tup.netloc, url_tup.path, fp,
-            content_settings=ContentSettings(content_type=content_encoding))
-    else:
-        conn.create_blob_from_stream(url_tup.netloc, url_tup.path, fp)
-
-    # To maintain consistency with the S3 version of this function we must
-    # return an object with a certain set of attributes.  Currently, that set
-    # of attributes consists of only 'size'
-    return _Key(size=size)
+    blob.upload_from_file(fp, num_retries=0, size=size,
+                          content_type=content_encoding)
+    return blob
 
 
 def uri_get_file(creds, uri, conn=None):
-    assert uri.startswith('wabs://')
-    url_tup = urlparse(uri)
-
-    if conn is None:
-        conn = BlockBlobService(account_name=creds.account_name,
-                account_key=creds.account_key)
-    return conn.get_blob_to_bytes(url_tup.netloc, url_tup.path).content
+    blob = _uri_to_blob(creds, uri, conn=conn)
+    return blob.download_as_string()
 
 
 def do_lzop_get(creds, url, path, decrypt, do_retry=True):
     """
-    Get and decompress a S3 URL
+    Get and decompress a GCS URL
 
     This streams the content directly to lzop; the compressed version
     is never stored on disk.
 
     """
     assert url.endswith('.lzo'), 'Expect an lzop-compressed file'
-    assert url.startswith('wabs://')
-
-    conn = BlockBlobService(account_name=creds.account_name,
-                account_key=creds.account_key)
 
     def log_wal_fetch_failures_on_error(exc_tup, exc_processor_cxt):
         def standard_detail_message(prefix=''):
@@ -103,18 +87,18 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
 
     def download():
         with files.DeleteOnError(path) as decomp_out:
+            blob = _uri_to_blob(creds, url)
             with get_download_pipeline(PIPE, decomp_out.f, decrypt) as pl:
-                g = gevent.spawn(write_and_return_error, url, conn, pl.stdin)
+                g = gevent.spawn(write_and_return_error, blob, pl.stdin)
 
                 try:
-                    # Raise any exceptions guarded by
-                    # write_and_return_error.
+                    # Raise any exceptions from write_and_return_error
                     exc = g.get()
                     if exc is not None:
                         raise exc
-                except AzureMissingResourceHttpError:
-                    # Short circuit any re-try attempts under certain race
-                    # conditions.
+                except exceptions.NotFound:
+                    # Do not retry if the blob not present, this
+                    # can happen under normal situations.
                     pl.abort()
                     logger.warning(
                         msg=('could no longer locate object while '
@@ -126,6 +110,8 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
                               'during restoration.'))
                     decomp_out.remove_regardless = True
                     return False
+                except:
+                    raise
 
             logger.info(
                 msg='completed download and decompression',
@@ -140,10 +126,9 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
     return download()
 
 
-def write_and_return_error(url, conn, stream):
+def write_and_return_error(blob, stream):
     try:
-        data = uri_get_file(None, url, conn=conn)
-        stream.write(data)
+        stream.write(blob.download_as_string())
         stream.flush()
     except Exception, e:
         return e

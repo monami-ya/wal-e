@@ -1,3 +1,4 @@
+import gs_integration_help
 import os
 import pytest
 import s3_integration_help
@@ -8,6 +9,7 @@ from wal_e import cmd
 _PREFIX_VARS = ['WALE_S3_PREFIX', 'WALE_WABS_PREFIX', 'WALE_SWIFT_PREFIX']
 
 _AWS_CRED_ENV_VARS = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']
+_GS_CRED_ENV_VARS = ['GOOGLE_APPLICATION_CREDENTIALS']
 
 
 class AwsTestConfig(object):
@@ -16,12 +18,13 @@ class AwsTestConfig(object):
     def __init__(self, request):
         self.env_vars = {}
         self.monkeypatch = request.getfuncargvalue('monkeypatch')
-
+        self.default_test_bucket = request.getfuncargvalue(
+            'default_test_bucket')
         for name in _AWS_CRED_ENV_VARS:
             maybe_value = os.getenv(name)
             self.env_vars[name] = maybe_value
 
-    def patch(self, test_name, default_test_bucket):
+    def patch(self, test_name):
         # Scrub WAL-E prefixes left around in the user's environment to
         # prevent unexpected results.
         for name in _PREFIX_VARS:
@@ -35,7 +38,7 @@ class AwsTestConfig(object):
                 self.monkeypatch.setenv(name, value)
 
         self.monkeypatch.setenv('WALE_S3_PREFIX', 's3://{0}/{1}'
-                                .format(default_test_bucket, test_name))
+                                .format(self.default_test_bucket, test_name))
 
     def main(self, *args):
         self.monkeypatch.setattr(sys, 'argv', ['wal-e'] + list(args))
@@ -46,11 +49,44 @@ class AwsTestConfigSetImpl(AwsTestConfig):
     name = 'aws+impl'
 
     # The same as AwsTestConfig but with a WALE_S3_ENDPOINT override.
-    def patch(self, test_name, default_test_bucket):
+    def patch(self, test_name):
         self.monkeypatch.setenv(
             'WALE_S3_ENDPOINT',
             'http+path://s3-us-west-1.amazonaws.com:80')
-        return AwsTestConfig.patch(self, test_name, default_test_bucket)
+        return AwsTestConfig.patch(self, test_name)
+
+
+class GsTestConfig(object):
+    name = 'gs'
+
+    def __init__(self, request):
+        self.env_vars = {}
+        self.monkeypatch = request.getfuncargvalue('monkeypatch')
+        self.bucket = request.getfuncargvalue('default_test_gs_bucket')
+
+        for name in _GS_CRED_ENV_VARS:
+            maybe_value = os.getenv(name)
+            self.env_vars[name] = maybe_value
+
+    def patch(self, test_name):
+        # Scrub WAL-E prefixes left around in the user's environment to
+        # prevent unexpected results.
+        for name in _PREFIX_VARS:
+            self.monkeypatch.delenv(name, raising=False)
+
+        # Set other credentials.
+        for name, value in self.env_vars.iteritems():
+            if value is None:
+                self.monkeypatch.delenv(name, raising=False)
+            else:
+                self.monkeypatch.setenv(name, value)
+
+        self.monkeypatch.setenv('WALE_GS_PREFIX', 'gs://{0}/{1}'
+                                .format(self.bucket, test_name))
+
+    def main(self, *args):
+        self.monkeypatch.setattr(sys, 'argv', ['wal-e'] + list(args))
+        return cmd.main()
 
 
 def _make_fixture_param_and_ids():
@@ -67,13 +103,16 @@ def _make_fixture_param_and_ids():
         _add_config(AwsTestConfig)
         _add_config(AwsTestConfigSetImpl)
 
+    if not gs_integration_help.no_real_gs_credentials():
+        _add_config(GsTestConfig)
+
     return ret
 
 
 @pytest.fixture(**_make_fixture_param_and_ids())
-def config(request, monkeypatch, default_test_bucket):
+def config(request, monkeypatch):
     config = request.param(request)
-    config.patch(request.node.name, default_test_bucket)
+    config.patch(request.node.name)
     return config
 
 

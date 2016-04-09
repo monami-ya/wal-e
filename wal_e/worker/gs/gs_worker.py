@@ -1,5 +1,5 @@
 """
-WAL-E Windows Azure Blob Service workers
+WAL-E AWS S3 workers
 
 These are functions that are amenable to be called from other modules,
 with the intention that they are used in gevent greenlets.
@@ -10,21 +10,25 @@ import re
 
 from wal_e import log_help
 from wal_e import storage
-from wal_e.blobstore import wabs
+from wal_e.blobstore import gs
 from wal_e.pipeline import get_download_pipeline
 from wal_e.piper import PIPE
 from wal_e.retries import retry
 from wal_e.tar_partition import TarPartition
 from wal_e.worker.base import _BackupList, _DeleteFromContext
 from wal_e.worker.base import generic_weird_key_hint_message
-from wal_e.worker.wabs.wabs_deleter import Deleter
+from wal_e.worker.gs.gs_deleter import Deleter
 
 logger = log_help.WalELogger(__name__)
 
 
+def get_bucket(conn, name):
+    return conn.get_bucket(name)
+
+
 class TarPartitionLister(object):
-    def __init__(self, wabs_conn, layout, backup_info):
-        self.wabs_conn = wabs_conn
+    def __init__(self, gs_conn, layout, backup_info):
+        self.gs_conn = gs_conn
         self.layout = layout
         self.backup_info = backup_info
 
@@ -32,13 +36,12 @@ class TarPartitionLister(object):
         prefix = self.layout.basebackup_tar_partition_directory(
             self.backup_info)
 
-        blob_list = self.wabs_conn.list_blobs(self.layout.store_name(),
-                                              prefix='/' + prefix)
-        for blob in blob_list:
-            url = 'wabs://{container}/{name}'.format(
-                container=self.layout.store_name(), name=blob.name)
-            name_last_part = blob.name.rsplit('/', 1)[-1]
-            match = re.match(storage.VOLUME_REGEXP, name_last_part)
+        bucket = get_bucket(self.gs_conn, self.layout.store_name())
+        for key in bucket.list_blobs(prefix='/' + prefix):
+            url = 'gs://{bucket}/{name}'.format(bucket=key.bucket.name,
+                                                name=key.name)
+            key_last_part = key.name.rsplit('/', 1)[-1]
+            match = re.match(storage.VOLUME_REGEXP, key_last_part)
             if match is None:
                 logger.warning(
                     msg='unexpected key found in tar volume directory',
@@ -46,15 +49,16 @@ class TarPartitionLister(object):
                             .format(url)),
                     hint=generic_weird_key_hint_message)
             else:
-                yield name_last_part
+                yield key_last_part
 
 
 class BackupFetcher(object):
-    def __init__(self, wabs_conn, layout, backup_info, local_root, decrypt):
-        self.wabs_conn = wabs_conn
+    def __init__(self, gs_conn, layout, backup_info, local_root, decrypt):
+        self.gs_conn = gs_conn
         self.layout = layout
         self.local_root = local_root
         self.backup_info = backup_info
+        self.bucket = get_bucket(self.gs_conn, self.layout.store_name())
         self.decrypt = decrypt
 
     @retry()
@@ -64,18 +68,16 @@ class BackupFetcher(object):
 
         logger.info(
             msg='beginning partition download',
-            detail=('The partition being downloaded is {0}.'
-                    .format(partition_name)),
-            hint='The absolute S3 key is {0}.'.format(part_abs_name))
+            detail='The partition being downloaded is {0}.'
+            .format(partition_name),
+            hint='The absolute GCS key is {0}.'.format(part_abs_name))
 
-        url = 'wabs://{ctr}/{path}'.format(ctr=self.layout.store_name(),
-                                           path=part_abs_name)
+        blob = self.bucket.get_blob('/' + part_abs_name)
         with get_download_pipeline(PIPE, PIPE, self.decrypt) as pl:
-            g = gevent.spawn(wabs.write_and_return_error,
-                             url, self.wabs_conn, pl.stdin)
+            g = gevent.spawn(gs.write_and_return_error, blob, pl.stdin)
             TarPartition.tarfile_extract(pl.stdout, self.local_root)
 
-            # Raise any exceptions from self._write_and_close
+            # Raise any exceptions guarded by write_and_return_error.
             exc = g.get()
             if exc is not None:
                 raise exc
@@ -83,30 +85,27 @@ class BackupFetcher(object):
 
 class BackupList(_BackupList):
 
-    def _backup_detail(self, blob):
-        return self.conn.get_blob_to_text(self.layout.store_name(),
-                        blob.name).content
+    def _backup_detail(self, key):
+        return key.get_contents_as_string()
 
     def _backup_list(self, prefix):
-        blob_list = self.conn.list_blobs(self.layout.store_name(),
-                                         prefix='/' + prefix)
-        return blob_list
+        bucket = get_bucket(self.conn, self.layout.store_name())
+        return bucket.list_blobs(prefix='/' + prefix)
 
 
 class DeleteFromContext(_DeleteFromContext):
 
-    def __init__(self, wabs_conn, layout, dry_run):
-        super(DeleteFromContext, self).__init__(wabs_conn, layout, dry_run)
+    def __init__(self, gs_conn, layout, dry_run):
+        super(DeleteFromContext, self).__init__(gs_conn, layout, dry_run)
 
         if not dry_run:
-            self.deleter = Deleter(self.conn, self.layout.store_name())
+            self.deleter = Deleter()
         else:
             self.deleter = None
 
     def _container_name(self, key):
-        return self.layout.store_name()
+        return key.bucket.name
 
     def _backup_list(self, prefix):
-        blob_list = self.conn.list_blobs(self.layout.store_name(),
-                                         prefix='/' + prefix)
-        return blob_list
+        bucket = get_bucket(self.conn, self.layout.store_name())
+        return bucket.list_blobs(prefix='/' + prefix)

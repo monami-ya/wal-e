@@ -1,7 +1,6 @@
 import collections
 import gevent
 import socket
-import shutil
 import traceback
 from urlparse import urlparse
 
