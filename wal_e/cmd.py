@@ -464,11 +464,12 @@ def configure_backup_cxt(args):
     # backend data stores, yielding value adhering to the
     # 'operator.Backup' protocol.
     if store.is_s3:
-        creds = s3_explicit_creds(args)
+        # we aren't using the creds anywhere and we just get the credentials from the environment
+        # creds = s3_explicit_creds(args)
 
         from wal_e.operator import s3_operator
 
-        return s3_operator.S3Backup(store, creds, gpg_key_id)
+        return s3_operator.S3Backup(store, None, gpg_key_id)
     elif store.is_wabs:
         account_name = args.wabs_account_name or os.getenv('WABS_ACCOUNT_NAME')
         if account_name is None:
