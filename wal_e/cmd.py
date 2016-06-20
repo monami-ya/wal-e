@@ -464,7 +464,8 @@ def configure_backup_cxt(args):
     # backend data stores, yielding value adhering to the
     # 'operator.Backup' protocol.
     if store.is_s3:
-        # we aren't using the creds anywhere and we just get the credentials from the environment
+        # we aren't using the creds anywhere and we just get
+        # the credentials from the environment
         # creds = s3_explicit_creds(args)
 
         from wal_e.operator import s3_operator
