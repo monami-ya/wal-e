@@ -96,7 +96,7 @@ will attempt to resolve them:
 
 * gevent>=0.13.1
 * boto>=2.6.0
-* azure-storage>=0.30.0
+* azure>=0.7.0
 * gcloud>=0.11.0
 * python-swiftclient>=1.8.0
 * python-keystoneclient>=0.4.2
