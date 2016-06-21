@@ -1,6 +1,10 @@
+import base64
 import collections
+import errno
 import gevent
+import os
 import socket
+import sys
 import traceback
 
 try:
@@ -24,6 +28,7 @@ except ImportError:
     from azure.storage import BlobService
 
 from . import calling_format
+from hashlib import md5
 from urlparse import urlparse
 from wal_e import log_help
 from wal_e import files
