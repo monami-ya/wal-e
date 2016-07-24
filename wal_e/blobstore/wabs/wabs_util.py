@@ -186,9 +186,11 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
     assert url.endswith('.lzo'), 'Expect an lzop-compressed file'
     assert url.startswith('wabs://')
 
+    logger.info(msg="blobstore enter")
     conn = BlobService(
         creds.account_name, creds.account_key,
         sas_token=creds.access_token, protocol='https')
+    logger.info(msg="blobstore exit")
 
     def log_wal_fetch_failures_on_error(exc_tup, exc_processor_cxt):
         def standard_detail_message(prefix=''):
@@ -225,8 +227,9 @@ def do_lzop_get(creds, url, path, decrypt, do_retry=True):
     def download():
         with files.DeleteOnError(path) as decomp_out:
             with get_download_pipeline(PIPE, decomp_out.f, decrypt) as pl:
+                logger.info(msg='enter gevent.spawn')
                 g = gevent.spawn(write_and_return_error, url, conn, pl.stdin)
-
+                logger.info(msg='exit gevent.spawn')
                 try:
                     # Raise any exceptions guarded by
                     # write_and_return_error.
