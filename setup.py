@@ -35,9 +35,9 @@ setup(
     extras_require={
         'aws': ['boto>=2.40.0'],
         'azure': ['azure>=1.0.3'],
-        'google': ['gcloud>=0.17.0'],
-        'swift': ['python-swiftclient>=3.0.0',
-                  'python-keystoneclient>=3.0.0']
+        'google': ['gcloud>=0.11.0'],
+        'swift': ['python-swiftclient>=1.8.0',
+                  'python-keystoneclient>=0.4.2']
     },
 
     # metadata for upload to PyPI
