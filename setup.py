@@ -35,7 +35,7 @@ setup(
     extras_require={
         'aws': ['boto>=2.40.0'],
         'azure': ['azure>=1.0.3'],
-        'google': ['gcloud>=0.11.0', 'oauth2client'],
+        'google': ['gcloud>=0.11.0', 'oauth2client>=3.0.0'],
         'swift': ['python-swiftclient>=1.8.0',
                   'python-keystoneclient>=0.4.2']
     },
