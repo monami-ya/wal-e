@@ -31,7 +31,7 @@ setup(
     version=VERSION,
     packages=find_packages(),
 
-    install_requires=['gevent>=1.1.1'],
+    install_requires=['gevent>=1.1.1','boto3>=1.2.3'],
     extras_require={
         'aws': ['boto>=2.40.0'],
         'azure': ['azure>=1.0.3'],
