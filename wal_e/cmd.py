@@ -679,5 +679,122 @@ def main():
     except Exception as e:
         logger.critical(
             msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail=''.join(traceback.format_exception(*sys.exc_info())))
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
+            detail='')
+        logger.critical(
+            msg='An unprocessed exception has avoided all error handling',
             detail=''.join(traceback.format_exception(*sys.exc_info())))
         sys.exit(2)
