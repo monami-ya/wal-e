@@ -207,5 +207,7 @@ class WalELogger(object):
 
     def critical(self, *args, **kwargs):
         self.log(logging.CRITICAL, *args, **kwargs)
+        for handler in HANDLERS:
+            handler.flush()
 
     # End convenience shims
